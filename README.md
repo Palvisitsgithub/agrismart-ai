@@ -74,6 +74,21 @@ data/raw/plantvillage/
 └── ...
 ```
 
+### Kaggle workflow
+
+Kaggle can be used either as the download source or as the training environment. Raw data is deliberately ignored by GitHub. Never commit Kaggle API tokens, downloaded datasets, or large model checkpoints to this repository.
+
+For local download, install the Kaggle CLI and authenticate using Kaggle's account settings. Store the downloaded `kaggle.json` in the location recommended by Kaggle, or configure the equivalent environment variables. Then run:
+
+```powershell
+python scripts/download_kaggle_dataset.py --slug OWNER/DATASET-SLUG --output-dir data/raw/plantvillage
+python scripts/inspect_dataset.py --input-dir data/raw/plantvillage
+```
+
+The exact Kaggle dataset slug must be recorded in the final README after we verify that it contains the intended PlantVillage classes. If the Kaggle dataset has an extra nested directory, move or point the preparation command at the directory containing the class folders.
+
+For Kaggle Notebook training, attach the dataset to the notebook, run `scripts/inspect_dataset.py`, then use the same `scripts/prepare_dataset.py` and `model.train` commands. Kaggle secrets should be used for credentials; they must not be pasted into this repository or chat.
+
 Then prepare a reproducible split:
 
 ```powershell
