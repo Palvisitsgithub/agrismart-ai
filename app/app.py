@@ -1,13 +1,17 @@
 """Streamlit farmer-facing disease prediction demo."""
 
 from pathlib import Path
+import sys
 
 import streamlit as st
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from model.predict import predict
 
 
-ROOT = Path(__file__).resolve().parents[1]
 CHECKPOINT = ROOT / "artifacts" / "efficientnet_b0" / "best.pt"
 
 
