@@ -31,7 +31,7 @@ def main() -> None:
     model.load_state_dict(checkpoint["state_dict"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
     truth, predictions = [], []
     with torch.inference_mode():
         for images, labels in tqdm(loader, desc=f"evaluating on {args.data_dir.name}", unit="batch"):
