@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
+from tqdm import tqdm
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,7 +43,7 @@ def make_loaders(data_dir: Path, image_size: int, batch_size: int):
     train_set = datasets.ImageFolder(data_dir / "train", transform=train_transform)
     val_set = datasets.ImageFolder(data_dir / "val", transform=eval_transform)
     test_set = datasets.ImageFolder(data_dir / "test", transform=eval_transform)
-    kwargs = {"batch_size": batch_size, "num_workers": 0}
+    kwargs = {"batch_size": batch_size, "num_workers": 2, "pin_memory": True}
     return train_set, val_set, test_set, DataLoader(train_set, shuffle=True, **kwargs), DataLoader(val_set, shuffle=False, **kwargs), DataLoader(test_set, shuffle=False, **kwargs)
 
 
@@ -77,13 +78,15 @@ def main() -> None:
 
     for epoch in range(1, args.epochs + 1):
         model.train()
-        for images, labels in train_loader:
+        progress = tqdm(train_loader, desc=f"epoch {epoch}/{args.epochs}", unit="batch", leave=False)
+        for images, labels in progress:
             optimizer.zero_grad()
             loss = criterion(model(images.to(device)), labels.to(device))
             loss.backward()
             optimizer.step()
+            progress.set_postfix(loss=f"{loss.item():.4f}")
         metrics = evaluate(model, val_loader, device)
-        print(f"epoch={epoch} val_accuracy={metrics['accuracy']:.4f} val_macro_f1={metrics['macro_f1']:.4f}")
+        print(f"epoch={epoch} val_accuracy={metrics['accuracy']:.4f} val_macro_f1={metrics['macro_f1']:.4f}", flush=True)
         if metrics["macro_f1"] > best_f1:
             best_f1 = metrics["macro_f1"]
             torch.save({"state_dict": model.state_dict(), "classes": train_set.classes, "image_size": args.image_size}, args.output_dir / "best.pt")
