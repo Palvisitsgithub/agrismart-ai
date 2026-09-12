@@ -13,6 +13,10 @@ artifacts/
 *.pth
 *.ckpt
 *.onnx
+!artifacts/
+!artifacts/efficientnet_b0/
+!artifacts/efficientnet_b0/best.pt
+!artifacts/efficientnet_b0/metrics.json
 
 # Local reports and secrets
 *.log
