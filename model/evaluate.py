@@ -35,7 +35,7 @@ def main() -> None:
         for images, labels in loader:
             logits = model(images)
             predictions.extend(logits.argmax(1).tolist())
-            truth.extend(classes[label] for label in labels)
+            truth.extend(dataset.classes[label] for label in labels)
             predictions[-len(labels):] = [classes[index] for index in predictions[-len(labels):]]
     result = {
         "accuracy": accuracy_score(truth, predictions),
