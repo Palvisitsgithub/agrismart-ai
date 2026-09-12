@@ -95,6 +95,12 @@ Then prepare a reproducible split:
 python scripts/prepare_dataset.py --input-dir data/raw/plantvillage --output-dir data/processed/plantvillage
 ```
 
+The selected Kaggle copy already provides `train` and `val` folders. For that layout, preserve the provided validation set and create an internal test split from the training folder:
+
+```powershell
+python scripts/create_internal_test_split.py --train-dir data/raw/plantvillage/train --val-dir data/raw/plantvillage/val --output-dir data/processed/plantvillage
+```
+
 Train the first transfer-learning model:
 
 ```powershell
