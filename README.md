@@ -19,8 +19,8 @@ The college is not providing a training dataset. Therefore, all training and dev
 
 | Role | Source | Use |
 |---|---|---|
-| Main training data | [PlantVillage](https://github.com/spMohanty/PlantVillage) | Labeled leaf images for model training and validation |
-| Field robustness check | [PlantDoc](https://github.com/pratikkayal/PlantDoc-Dataset) | Real-world images with natural backgrounds and lighting |
+| Main training data | [PlantVillage on Kaggle](https://www.kaggle.com/datasets/mohitsingh1804/plantvillage) | Labeled leaf images for model training and validation |
+| Field robustness check | [PlantDoc on Kaggle](https://www.kaggle.com/datasets/yusufmurtaza01/plantdoc-object-detection-dataset) | Real-world images with natural backgrounds and lighting; use only after inspecting its labels and format |
 | Weather | [Open-Meteo](https://open-meteo.com/) or [NASA POWER](https://power.larc.nasa.gov/) | Forecast and historical weather signals |
 | Soil | [SoilGrids](https://www.isric.org/explore/soilgrids) | Soil properties by location |
 | India crop data | [data.gov.in](https://data.gov.in/) | Crop-production and agriculture context |
@@ -85,7 +85,7 @@ python scripts/download_kaggle_dataset.py --slug OWNER/DATASET-SLUG --output-dir
 python scripts/inspect_dataset.py --input-dir data/raw/plantvillage
 ```
 
-The exact Kaggle dataset slug must be recorded in the final README after we verify that it contains the intended PlantVillage classes. If the Kaggle dataset has an extra nested directory, move or point the preparation command at the directory containing the class folders.
+The selected PlantVillage Kaggle slug is `mohitsingh1804/plantvillage`. It advertises the full 38-class PlantVillage collection. Before training, inspect the downloaded archive and point the preparation command at the directory containing the class folders. If the archive has an extra nested directory, do not rename disease classes silently; record the resolved path and class mapping in the report.
 
 For Kaggle Notebook training, attach the dataset to the notebook, run `scripts/inspect_dataset.py`, then use the same `scripts/prepare_dataset.py` and `model.train` commands. Kaggle secrets should be used for credentials; they must not be pasted into this repository or chat.
 
