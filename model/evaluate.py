@@ -7,6 +7,7 @@ import torch
 from sklearn.metrics import accuracy_score, classification_report, f1_score
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
+from tqdm import tqdm
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -28,12 +29,13 @@ def main() -> None:
     model = models.efficientnet_b0(weights=None)
     model.classifier[1] = torch.nn.Linear(model.classifier[1].in_features, len(classes))
     model.load_state_dict(checkpoint["state_dict"])
-    model.eval()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device).eval()
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
     truth, predictions = [], []
     with torch.inference_mode():
-        for images, labels in loader:
-            logits = model(images)
+        for images, labels in tqdm(loader, desc=f"evaluating on {args.data_dir.name}", unit="batch"):
+            logits = model(images.to(device))
             predictions.extend(logits.argmax(1).tolist())
             truth.extend(dataset.classes[label] for label in labels)
             predictions[-len(labels):] = [classes[index] for index in predictions[-len(labels):]]
