@@ -17,6 +17,8 @@ artifacts/
 !artifacts/efficientnet_b0/
 !artifacts/efficientnet_b0/best.pt
 !artifacts/efficientnet_b0/metrics.json
+!artifacts/mixed_finetuned.pt
+artifacts/uploaded_leaf.jpg
 
 # Local reports and secrets
 *.log

@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 from model.predict import predict
 
 
-CHECKPOINT = ROOT / "artifacts" / "efficientnet_b0" / "best.pt"
+CHECKPOINT = ROOT / "artifacts" / "mixed_finetuned.pt"
 
 
 ADVICE = {
@@ -37,7 +37,7 @@ st.title("🌿 AgriSmart AI")
 st.caption("Plant disease detection powered by an EfficientNet-B0 model trained on PlantVillage.")
 
 if not CHECKPOINT.exists():
-    st.error("The trained model file is missing. Expected: artifacts/efficientnet_b0/best.pt")
+    st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
     st.stop()
 
 uploaded = st.file_uploader("Upload a clear leaf image", type=["jpg", "jpeg", "png"])
