@@ -4,7 +4,9 @@ from pathlib import Path
 import sys
 
 import requests
+import folium
 import streamlit as st
+from streamlit_folium import st_folium
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -97,9 +99,20 @@ st.title("🌿 AgriSmart AI")
 st.caption("Plant disease detection powered by an EfficientNet-B0 model trained on PlantVillage.")
 
 with st.sidebar:
-    st.header("Farm context")
-    latitude = st.number_input("Latitude", min_value=-90.0, max_value=90.0, value=20.5937, format="%.4f")
-    longitude = st.number_input("Longitude", min_value=-180.0, max_value=180.0, value=78.9629, format="%.4f")
+    st.header("Farm location")
+    st.caption("Click your farm location on the map.")
+    st.session_state.setdefault("farm_location", {"lat": 20.5937, "lon": 78.9629})
+    location = st.session_state["farm_location"]
+    farm_map = folium.Map(location=[location["lat"], location["lon"]], zoom_start=5, control_scale=True)
+    folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
+    map_state = st_folium(farm_map, height=300, width=280, key="farm_location_map")
+    if map_state and map_state.get("last_clicked"):
+        clicked = map_state["last_clicked"]
+        st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
+        location = st.session_state["farm_location"]
+    latitude = location["lat"]
+    longitude = location["lon"]
+    st.caption(f"Selected: {latitude:.4f}, {longitude:.4f}")
     season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"])
     soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35)
     st.caption("Weather: Open-Meteo · Soil: SoilGrids")
