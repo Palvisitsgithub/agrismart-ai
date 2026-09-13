@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 
+import requests
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,9 +33,76 @@ def advice_for(label: str) -> str:
     return "Use this result as an early warning, inspect nearby plants, and consult a qualified agricultural expert before applying treatment."
 
 
+@st.cache_data(ttl=1800)
+def get_weather(latitude: float, longitude: float) -> dict:
+    response = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": "temperature_2m,relative_humidity_2m,precipitation,rain",
+            "daily": "precipitation_probability_max,precipitation_sum",
+            "forecast_days": 1,
+            "timezone": "auto",
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    current = payload.get("current", {})
+    daily = payload.get("daily", {})
+    return {
+        "temperature": current.get("temperature_2m"),
+        "humidity": current.get("relative_humidity_2m"),
+        "rain": current.get("rain", 0),
+        "rain_probability": (daily.get("precipitation_probability_max") or [None])[0],
+        "rain_sum": (daily.get("precipitation_sum") or [None])[0],
+    }
+
+
+@st.cache_data(ttl=86400)
+def get_soil(latitude: float, longitude: float) -> dict:
+    response = requests.get(
+        "https://rest.isric.org/soilgrids/v2.0/properties/query",
+        params={"lon": longitude, "lat": latitude, "property": "phh2o", "depth": "0-5cm", "value": "mean"},
+        timeout=20,
+    )
+    response.raise_for_status()
+    layers = response.json().get("properties", {}).get("layers", [])
+    for layer in layers:
+        if layer.get("name") == "phh2o":
+            depths = layer.get("depths", [])
+            if depths and depths[0].get("values", {}).get("mean") is not None:
+                return {"ph": depths[0]["values"]["mean"] / 10}
+    return {"ph": None}
+
+
+def recommend_crops(ph: float | None, temperature: float | None, moisture: float, season: str) -> list[str]:
+    recommendations = []
+    if ph is None:
+        return ["Enter soil pH or use the SoilGrids lookup to receive recommendations."]
+    if 5.5 <= ph <= 7.0 and moisture >= 25:
+        recommendations.extend(["Tomato", "Potato", "Corn"])
+    if 6.0 <= ph <= 7.5 and 20 <= moisture <= 60:
+        recommendations.append("Grape")
+    if 5.5 <= ph <= 6.8 and (temperature is None or temperature >= 18):
+        recommendations.append("Apple")
+    if not recommendations:
+        recommendations.append("Choose a crop after local agronomist review; the current soil inputs do not match the demo rules.")
+    return list(dict.fromkeys(recommendations))
+
+
 st.set_page_config(page_title="AgriSmart AI", page_icon="🌿", layout="centered")
 st.title("🌿 AgriSmart AI")
 st.caption("Plant disease detection powered by an EfficientNet-B0 model trained on PlantVillage.")
+
+with st.sidebar:
+    st.header("Farm context")
+    latitude = st.number_input("Latitude", min_value=-90.0, max_value=90.0, value=20.5937, format="%.4f")
+    longitude = st.number_input("Longitude", min_value=-180.0, max_value=180.0, value=78.9629, format="%.4f")
+    season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"])
+    soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35)
+    st.caption("Weather: Open-Meteo · Soil: SoilGrids")
 
 if not CHECKPOINT.exists():
     st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
@@ -51,3 +119,37 @@ if uploaded:
     st.metric("Confidence", f"{result['confidence']:.1%}")
     st.info(advice_for(result["class"]))
     st.caption("This is a screening result, not a substitute for professional agricultural advice.")
+
+st.divider()
+st.header("🌦️ Weather intelligence")
+try:
+    weather = get_weather(latitude, longitude)
+    weather_columns = st.columns(4)
+    weather_columns[0].metric("Temperature", f"{weather['temperature']} °C")
+    weather_columns[1].metric("Humidity", f"{weather['humidity']} %")
+    weather_columns[2].metric("Rain probability", f"{weather['rain_probability']} %")
+    weather_columns[3].metric("Rain forecast", f"{weather['rain_sum']} mm")
+    if weather["rain_probability"] is not None and weather["rain_probability"] >= 60:
+        st.info("Rain is likely. Consider delaying irrigation and avoid wetting leaves.")
+    else:
+        st.info("Rain risk is currently lower. Check soil moisture before irrigating.")
+except requests.RequestException:
+    st.warning("Weather service is unavailable. The disease classifier still works.")
+
+st.header("🪨 Soil information")
+try:
+    soil = get_soil(latitude, longitude)
+    soil_ph = soil.get("ph")
+    if soil_ph is not None:
+        st.metric("Estimated topsoil pH", f"{soil_ph:.1f}")
+    else:
+        st.info("SoilGrids did not return a pH value for this location.")
+except requests.RequestException:
+    soil_ph = None
+    st.warning("SoilGrids is unavailable. Entering local soil measurements is recommended.")
+
+st.header("🌾 Crop recommendation")
+temperature = weather.get("temperature") if "weather" in locals() else None
+recommendations = recommend_crops(soil_ph, temperature, soil_moisture, season)
+st.write(f"Indicative recommendations for {season}: " + ", ".join(recommendations))
+st.caption("These are educational recommendations based on simple rules, not professional agricultural advice.")
