@@ -94,102 +94,112 @@ def recommend_crops(ph: float | None, temperature: float | None, moisture: float
     return list(dict.fromkeys(recommendations))
 
 
-st.set_page_config(page_title="AgriSmart AI", page_icon="🌿", layout="centered")
+st.set_page_config(page_title="AgriSmart AI", page_icon="🌿", layout="wide")
 st.title("🌿 AgriSmart AI")
-st.caption("Plant disease detection powered by an EfficientNet-B0 model trained on PlantVillage.")
+st.caption("Choose a feature below to scan a plant or review farm conditions.")
 
-with st.sidebar:
-    st.header("Farm location")
-    st.session_state.setdefault("farm_location", {"lat": 20.5937, "lon": 78.9629})
-    st.session_state.setdefault("location_confirmed", False)
+st.session_state.setdefault("farm_location", {"lat": 20.5937, "lon": 78.9629})
+st.session_state.setdefault("location_confirmed", False)
+
+scan_tab, farm_tab = st.tabs(["📷 Scan plant photo", "📍 Farm location & soil"])
+
+with scan_tab:
+    st.header("Scan a plant photo")
+    st.write("Upload a clear leaf image to receive a disease screening result.")
+    if not CHECKPOINT.exists():
+        st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
+    else:
+        uploaded = st.file_uploader(
+            "Upload a clear leaf image",
+            type=["jpg", "jpeg", "png"],
+            key="plant_scan_upload",
+        )
+        if uploaded:
+            st.image(uploaded, caption="Uploaded leaf image", use_container_width=True)
+            temporary_image = ROOT / "artifacts" / "uploaded_leaf.jpg"
+            temporary_image.write_bytes(uploaded.getvalue())
+            result = predict(temporary_image, CHECKPOINT)
+            st.subheader("Prediction")
+            st.success(result["class"])
+            st.metric("Confidence", f"{result['confidence']:.1%}")
+            st.info(advice_for(result["class"]))
+            st.caption("This is a screening result, not a substitute for professional agricultural advice.")
+
+with farm_tab:
+    st.header("Farm location & soil information")
+    st.write("Choose your farm location to view weather, soil, and crop recommendations.")
+
     location = st.session_state["farm_location"]
     latitude = location["lat"]
     longitude = location["lon"]
-    st.caption(f"Selected: {latitude:.4f}, {longitude:.4f}")
-    if not st.session_state["location_confirmed"]:
-        if st.button("Confirm location", use_container_width=True):
-            st.session_state["location_confirmed"] = True
-            st.rerun()
-    else:
+    confirmed = st.session_state["location_confirmed"]
+    st.caption(f"Selected location: {latitude:.4f}, {longitude:.4f}")
+
+    if confirmed:
         st.success("Location confirmed")
-        if st.button("Select location again", use_container_width=True):
+        if st.button("Select location again", use_container_width=False):
             st.session_state["location_confirmed"] = False
             st.rerun()
-    season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"])
-    soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35)
-
-st.subheader("Farm location")
-if st.session_state["location_confirmed"]:
-    st.caption("Location is confirmed. Click 'Select location again' in the sidebar to move the marker.")
-else:
-    st.caption("Click the map to place the farm marker, then confirm it from the sidebar.")
-location = st.session_state["farm_location"]
-farm_map = folium.Map(
-    location=[location["lat"], location["lon"]],
-    zoom_start=5,
-    control_scale=True,
-    zoom_control=not st.session_state["location_confirmed"],
-    dragging=not st.session_state["location_confirmed"],
-    scrollWheelZoom=not st.session_state["location_confirmed"],
-    doubleClickZoom=not st.session_state["location_confirmed"],
-    touchZoom=not st.session_state["location_confirmed"],
-)
-folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
-map_state = st_folium(farm_map, height=500, use_container_width=True, key="farm_location_map")
-if not st.session_state["location_confirmed"] and map_state and map_state.get("last_clicked"):
-    clicked = map_state["last_clicked"]
-    st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
-    st.rerun()
-location = st.session_state["farm_location"]
-latitude = location["lat"]
-longitude = location["lon"]
-
-if not CHECKPOINT.exists():
-    st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
-    st.stop()
-
-uploaded = st.file_uploader("Upload a clear leaf image", type=["jpg", "jpeg", "png"])
-if uploaded:
-    st.image(uploaded, caption="Uploaded leaf image", use_container_width=True)
-    temporary_image = ROOT / "artifacts" / "uploaded_leaf.jpg"
-    temporary_image.write_bytes(uploaded.getvalue())
-    result = predict(temporary_image, CHECKPOINT)
-    st.subheader("Prediction")
-    st.success(result["class"])
-    st.metric("Confidence", f"{result['confidence']:.1%}")
-    st.info(advice_for(result["class"]))
-    st.caption("This is a screening result, not a substitute for professional agricultural advice.")
-
-st.divider()
-st.header("🌦️ Weather intelligence")
-try:
-    weather = get_weather(latitude, longitude)
-    weather_columns = st.columns(4)
-    weather_columns[0].metric("Temperature", f"{weather['temperature']} °C")
-    weather_columns[1].metric("Humidity", f"{weather['humidity']} %")
-    weather_columns[2].metric("Rain probability", f"{weather['rain_probability']} %")
-    weather_columns[3].metric("Rain forecast", f"{weather['rain_sum']} mm")
-    if weather["rain_probability"] is not None and weather["rain_probability"] >= 60:
-        st.info("Rain is likely. Consider delaying irrigation and avoid wetting leaves.")
+        st.caption("The map is locked. Select the button above to choose a different location.")
     else:
-        st.info("Rain risk is currently lower. Check soil moisture before irrigating.")
-except requests.RequestException:
-    st.warning("Weather service is unavailable. The disease classifier still works.")
+        st.info("Click the map to place the marker, then confirm the location.")
 
-st.header("🪨 Soil information")
-try:
-    soil = get_soil(latitude, longitude)
-    soil_ph = soil.get("ph")
-    if soil_ph is not None:
-        st.metric("Estimated topsoil pH", f"{soil_ph:.1f}")
-    else:
-        st.info("SoilGrids did not return a pH value for this location.")
-except requests.RequestException:
-    soil_ph = None
-    st.warning("SoilGrids is unavailable. Entering local soil measurements is recommended.")
+    farm_map = folium.Map(
+        location=[latitude, longitude],
+        zoom_start=5,
+        control_scale=True,
+        zoom_control=not confirmed,
+        dragging=not confirmed,
+        scrollWheelZoom=not confirmed,
+        doubleClickZoom=not confirmed,
+        touchZoom=not confirmed,
+    )
+    folium.Marker([latitude, longitude], tooltip="Selected farm").add_to(farm_map)
+    map_state = st_folium(farm_map, height=500, use_container_width=True, key="farm_location_map")
+    if not confirmed and map_state and map_state.get("last_clicked"):
+        clicked = map_state["last_clicked"]
+        st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
+        st.rerun()
 
-st.header("🌾 Crop recommendation")
-temperature = weather.get("temperature") if "weather" in locals() else None
-recommendations = recommend_crops(soil_ph, temperature, soil_moisture, season)
-st.write(f"Indicative recommendations for {season}: " + ", ".join(recommendations))
-st.caption("These are educational recommendations based on simple rules, not professional agricultural advice.")
+    if not confirmed:
+        if st.button("Confirm location", type="primary"):
+            st.session_state["location_confirmed"] = True
+            st.rerun()
+
+    season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"], key="farm_season")
+    soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35, key="farm_soil_moisture")
+
+    st.divider()
+    st.header("🌦️ Weather intelligence")
+    try:
+        weather = get_weather(latitude, longitude)
+        weather_columns = st.columns(4)
+        weather_columns[0].metric("Temperature", f"{weather['temperature']} °C")
+        weather_columns[1].metric("Humidity", f"{weather['humidity']} %")
+        weather_columns[2].metric("Rain probability", f"{weather['rain_probability']} %")
+        weather_columns[3].metric("Rain forecast", f"{weather['rain_sum']} mm")
+        if weather["rain_probability"] is not None and weather["rain_probability"] >= 60:
+            st.info("Rain is likely. Consider delaying irrigation and avoid wetting leaves.")
+        else:
+            st.info("Rain risk is currently lower. Check soil moisture before irrigating.")
+    except requests.RequestException:
+        weather = {}
+        st.warning("Weather service is unavailable. Location-based recommendations may be limited.")
+
+    st.header("🪨 Soil information")
+    try:
+        soil = get_soil(latitude, longitude)
+        soil_ph = soil.get("ph")
+        if soil_ph is not None:
+            st.metric("Estimated topsoil pH", f"{soil_ph:.1f}")
+        else:
+            st.info("Soil data did not return a pH value for this location.")
+    except requests.RequestException:
+        soil_ph = None
+        st.warning("Soil data is unavailable. Entering local soil measurements is recommended.")
+
+    st.header("🌾 Crop recommendation")
+    temperature = weather.get("temperature")
+    recommendations = recommend_crops(soil_ph, temperature, soil_moisture, season)
+    st.write(f"Indicative recommendations for {season}: " + ", ".join(recommendations))
+    st.caption("These are educational recommendations based on simple rules, not professional agricultural advice.")
