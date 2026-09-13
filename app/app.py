@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import sys
+import time
 
 import requests
 import folium
@@ -95,6 +96,31 @@ def recommend_crops(ph: float | None, temperature: float | None, moisture: float
 
 
 st.set_page_config(page_title="AgriSmart AI", page_icon="🌿", layout="wide")
+st.markdown(
+    """
+    <style>
+    .block-container { max-width: 1180px; padding-top: 2rem; padding-bottom: 3rem; }
+    div[data-testid="stFileUploader"] {
+        border: 1px dashed #79a982;
+        border-radius: 16px;
+        padding: 0.6rem;
+        background: #f7fbf7;
+    }
+    div[data-testid="stMetric"] {
+        background: #f7fbf7;
+        border: 1px solid #e2eee3;
+        border-radius: 14px;
+        padding: 0.8rem;
+    }
+    div.stButton > button {
+        border-radius: 10px;
+        min-height: 2.6rem;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("🌿 AgriSmart AI")
 st.caption("Choose a feature below to scan a plant or review farm conditions.")
 
@@ -115,13 +141,28 @@ with scan_tab:
             key="plant_scan_upload",
         )
         if uploaded:
-            st.image(uploaded, caption="Uploaded leaf image", use_container_width=True)
+            preview_col, details_col = st.columns([1.15, 1], gap="large")
+            with preview_col:
+                st.image(uploaded, caption="Uploaded leaf image", use_container_width=True)
+            with details_col:
+                st.info("The image will be checked against the trained plant-disease model.")
             temporary_image = ROOT / "artifacts" / "uploaded_leaf.jpg"
             temporary_image.write_bytes(uploaded.getvalue())
-            result = predict(temporary_image, CHECKPOINT)
+            with st.status("Analyzing your plant image...", expanded=True) as analysis_status:
+                st.write("Preparing image")
+                time.sleep(0.35)
+                st.write("Comparing visual patterns")
+                time.sleep(0.35)
+                result = predict(temporary_image, CHECKPOINT)
+                time.sleep(0.35)
+                st.write("Preparing your result")
+                analysis_status.update(label="Analysis complete", state="complete", expanded=False)
             st.subheader("Prediction")
-            st.success(result["class"])
-            st.metric("Confidence", f"{result['confidence']:.1%}")
+            result_col, confidence_col = st.columns([2, 1])
+            with result_col:
+                st.success(result["class"])
+            with confidence_col:
+                st.metric("Confidence", f"{result['confidence']:.1%}")
             st.info(advice_for(result["class"]))
             st.caption("This is a screening result, not a substitute for professional agricultural advice.")
 
@@ -166,8 +207,10 @@ with farm_tab:
             st.session_state["location_confirmed"] = True
             st.rerun()
 
-    season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"], key="farm_season")
-    soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35, key="farm_soil_moisture")
+    controls_col, spacer_col = st.columns([1, 3])
+    with controls_col:
+        season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"], key="farm_season")
+        soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35, key="farm_soil_moisture")
 
     st.divider()
     st.header("🌦️ Weather intelligence")
