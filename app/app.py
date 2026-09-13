@@ -100,22 +100,34 @@ st.caption("Plant disease detection powered by an EfficientNet-B0 model trained 
 
 with st.sidebar:
     st.header("Farm location")
-    st.caption("Click your farm location on the map.")
     st.session_state.setdefault("farm_location", {"lat": 20.5937, "lon": 78.9629})
+    st.session_state.setdefault("show_location_map", False)
     location = st.session_state["farm_location"]
-    farm_map = folium.Map(location=[location["lat"], location["lon"]], zoom_start=5, control_scale=True)
-    folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
-    map_state = st_folium(farm_map, height=300, width=280, key="farm_location_map")
-    if map_state and map_state.get("last_clicked"):
-        clicked = map_state["last_clicked"]
-        st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
-        location = st.session_state["farm_location"]
+    if st.button("Select location on map", use_container_width=True):
+        st.session_state["show_location_map"] = True
     latitude = location["lat"]
     longitude = location["lon"]
     st.caption(f"Selected: {latitude:.4f}, {longitude:.4f}")
     season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"])
     soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35)
-    st.caption("Weather: Open-Meteo · Soil: SoilGrids")
+
+if st.session_state.get("show_location_map"):
+    st.subheader("Select your farm location")
+    st.caption("Click the map to place the farm marker, then close this section.")
+    location = st.session_state["farm_location"]
+    farm_map = folium.Map(location=[location["lat"], location["lon"]], zoom_start=5, control_scale=True)
+    folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
+    map_state = st_folium(farm_map, height=500, use_container_width=True, key="farm_location_map")
+    if map_state and map_state.get("last_clicked"):
+        clicked = map_state["last_clicked"]
+        st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
+        st.success(f"Location selected: {clicked['lat']:.4f}, {clicked['lng']:.4f}")
+    if st.button("Done selecting location"):
+        st.session_state["show_location_map"] = False
+        st.rerun()
+    location = st.session_state["farm_location"]
+    latitude = location["lat"]
+    longitude = location["lon"]
 
 if not CHECKPOINT.exists():
     st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
