@@ -101,33 +101,48 @@ st.caption("Plant disease detection powered by an EfficientNet-B0 model trained 
 with st.sidebar:
     st.header("Farm location")
     st.session_state.setdefault("farm_location", {"lat": 20.5937, "lon": 78.9629})
-    st.session_state.setdefault("show_location_map", False)
+    st.session_state.setdefault("location_confirmed", False)
     location = st.session_state["farm_location"]
-    if st.button("Select location on map", use_container_width=True):
-        st.session_state["show_location_map"] = True
     latitude = location["lat"]
     longitude = location["lon"]
     st.caption(f"Selected: {latitude:.4f}, {longitude:.4f}")
+    if not st.session_state["location_confirmed"]:
+        if st.button("Confirm location", use_container_width=True):
+            st.session_state["location_confirmed"] = True
+            st.rerun()
+    else:
+        st.success("Location confirmed")
+        if st.button("Select location again", use_container_width=True):
+            st.session_state["location_confirmed"] = False
+            st.rerun()
     season = st.selectbox("Season", ["Kharif", "Rabi", "Summer", "Other"])
     soil_moisture = st.slider("Soil moisture (%)", 0, 100, 35)
 
-if st.session_state.get("show_location_map"):
-    st.subheader("Select your farm location")
-    st.caption("Click the map to place the farm marker, then close this section.")
-    location = st.session_state["farm_location"]
-    farm_map = folium.Map(location=[location["lat"], location["lon"]], zoom_start=5, control_scale=True)
-    folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
-    map_state = st_folium(farm_map, height=500, use_container_width=True, key="farm_location_map")
-    if map_state and map_state.get("last_clicked"):
-        clicked = map_state["last_clicked"]
-        st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
-        st.success(f"Location selected: {clicked['lat']:.4f}, {clicked['lng']:.4f}")
-    if st.button("Done selecting location"):
-        st.session_state["show_location_map"] = False
-        st.rerun()
-    location = st.session_state["farm_location"]
-    latitude = location["lat"]
-    longitude = location["lon"]
+st.subheader("Farm location")
+if st.session_state["location_confirmed"]:
+    st.caption("Location is confirmed. Click 'Select location again' in the sidebar to move the marker.")
+else:
+    st.caption("Click the map to place the farm marker, then confirm it from the sidebar.")
+location = st.session_state["farm_location"]
+farm_map = folium.Map(
+    location=[location["lat"], location["lon"]],
+    zoom_start=5,
+    control_scale=True,
+    zoom_control=not st.session_state["location_confirmed"],
+    dragging=not st.session_state["location_confirmed"],
+    scrollWheelZoom=not st.session_state["location_confirmed"],
+    doubleClickZoom=not st.session_state["location_confirmed"],
+    touchZoom=not st.session_state["location_confirmed"],
+)
+folium.Marker([location["lat"], location["lon"]], tooltip="Selected farm").add_to(farm_map)
+map_state = st_folium(farm_map, height=500, use_container_width=True, key="farm_location_map")
+if not st.session_state["location_confirmed"] and map_state and map_state.get("last_clicked"):
+    clicked = map_state["last_clicked"]
+    st.session_state["farm_location"] = {"lat": clicked["lat"], "lon": clicked["lng"]}
+    st.rerun()
+location = st.session_state["farm_location"]
+latitude = location["lat"]
+longitude = location["lon"]
 
 if not CHECKPOINT.exists():
     st.error("The trained model file is missing. Expected: artifacts/mixed_finetuned.pt")
